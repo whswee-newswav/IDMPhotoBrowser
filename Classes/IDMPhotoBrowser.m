@@ -365,43 +365,48 @@ NSLocalizedStringFromTableInBundle((key), nil, [NSBundle bundleWithPath:[[NSBund
 
 - (void)performPresentAnimation {
     self.view.alpha = 0.0f;
+    self.view.hidden = YES;
     _pagingScrollView.alpha = 0.0f;
-
+    
     UIImage *imageFromView = _scaleImage ? _scaleImage : [self getImageFromView:_senderViewForAnimation];
-
+    
+    if ([_senderViewForAnimation isKindOfClass:[UIImageView class]]) {
+        UIImageView *senderImageView = (UIImageView *) _senderViewForAnimation;
+        if (senderImageView.image) {
+            imageFromView = senderImageView.image;
+        }
+    }
+    
     _senderViewOriginalFrame = [_senderViewForAnimation.superview convertRect:_senderViewForAnimation.frame toView:nil];
-
+    
     UIView *fadeView = [[UIView alloc] initWithFrame:_applicationWindow.bounds];
     fadeView.backgroundColor = [UIColor clearColor];
     [_applicationWindow addSubview:fadeView];
-
+    
     UIImageView *resizableImageView = [[UIImageView alloc] initWithImage:imageFromView];
     resizableImageView.frame = _senderViewOriginalFrame;
     resizableImageView.clipsToBounds = YES;
     resizableImageView.contentMode = _senderViewForAnimation ? _senderViewForAnimation.contentMode : UIViewContentModeScaleAspectFill;
+    resizableImageView.layer.contentsRect = _senderViewForAnimation.layer.contentsRect;
     resizableImageView.backgroundColor = [UIColor clearColor];
-    if (@available(iOS 11.0, *)) {
-        resizableImageView.accessibilityIgnoresInvertColors = YES;
-    } else {
-        // Fallback on earlier versions
-    }
     [_applicationWindow addSubview:resizableImageView];
     _senderViewForAnimation.hidden = YES;
-
+    
     void (^completion)() = ^() {
+        self.view.hidden = NO;
         self.view.alpha = 1.0f;
         _pagingScrollView.alpha = 1.0f;
         resizableImageView.backgroundColor = [UIColor colorWithWhite:(_useWhiteBackgroundColor) ? 1 : 0 alpha:1];
         [fadeView removeFromSuperview];
         [resizableImageView removeFromSuperview];
     };
-
+    
     [UIView animateWithDuration:_animationDuration animations:^{
         fadeView.backgroundColor = self.useWhiteBackgroundColor ? [UIColor whiteColor] : [UIColor blackColor];
     } completion:nil];
-
+    
     CGRect finalImageViewFrame = [self animationFrameForImage:imageFromView presenting:YES scrollView:nil];
-
+    
     if(_usePopAnimation)
     {
         [self animateView:resizableImageView
@@ -411,6 +416,7 @@ NSLocalizedStringFromTableInBundle((key), nil, [NSBundle bundleWithPath:[[NSBund
     else
     {
         [UIView animateWithDuration:_animationDuration animations:^{
+            resizableImageView.layer.contentsRect = CGRectMake(0, 0, 1, 1);
             resizableImageView.layer.frame = finalImageViewFrame;
         } completion:^(BOOL finished) {
             completion();
@@ -422,53 +428,48 @@ NSLocalizedStringFromTableInBundle((key), nil, [NSBundle bundleWithPath:[[NSBund
     if ([_delegate respondsToSelector:@selector(willDisappearPhotoBrowser:)]) {
         [_delegate willDisappearPhotoBrowser:self];
     }
-
+    
     float fadeAlpha = 1 - fabs(scrollView.frame.origin.y)/scrollView.frame.size.height;
-
+    
     UIImage *imageFromView = [scrollView.photo underlyingImage];
     if (!imageFromView && [scrollView.photo respondsToSelector:@selector(placeholderImage)]) {
         imageFromView = [scrollView.photo placeholderImage];
     }
-
+    
     UIView *fadeView = [[UIView alloc] initWithFrame:_applicationWindow.bounds];
     fadeView.backgroundColor = self.useWhiteBackgroundColor ? [UIColor whiteColor] : [UIColor blackColor];
     fadeView.alpha = fadeAlpha;
     [_applicationWindow addSubview:fadeView];
-
+    
     CGRect imageViewFrame = [self animationFrameForImage:imageFromView presenting:NO scrollView:scrollView];
-
+    
     UIImageView *resizableImageView = [[UIImageView alloc] initWithImage:imageFromView];
     resizableImageView.frame = imageViewFrame;
     resizableImageView.contentMode = _senderViewForAnimation ? _senderViewForAnimation.contentMode : UIViewContentModeScaleAspectFill;
     resizableImageView.backgroundColor = [UIColor clearColor];
     resizableImageView.clipsToBounds = YES;
-    if (@available(iOS 11.0, *)) {
-        resizableImageView.accessibilityIgnoresInvertColors = YES;
-    } else {
-        // Fallback on earlier versions
-    }
     [_applicationWindow addSubview:resizableImageView];
     self.view.hidden = YES;
-
+    
     void (^completion)() = ^() {
         _senderViewForAnimation.hidden = NO;
         _senderViewForAnimation = nil;
         _scaleImage = nil;
-
+        
         [fadeView removeFromSuperview];
         [resizableImageView removeFromSuperview];
-
+        
         [self prepareForClosePhotoBrowser];
         [self dismissPhotoBrowserAnimated:NO];
     };
-
+    
     [UIView animateWithDuration:_animationDuration animations:^{
         fadeView.alpha = 0;
         self.view.backgroundColor = [UIColor clearColor];
     } completion:nil];
-
+    
     CGRect senderViewOriginalFrame = _senderViewForAnimation.superview ? [_senderViewForAnimation.superview convertRect:_senderViewForAnimation.frame toView:nil] : _senderViewOriginalFrame;
-
+    
     if(_usePopAnimation)
     {
         [self animateView:resizableImageView
@@ -478,6 +479,7 @@ NSLocalizedStringFromTableInBundle((key), nil, [NSBundle bundleWithPath:[[NSBund
     else
     {
         [UIView animateWithDuration:_animationDuration animations:^{
+            resizableImageView.layer.contentsRect = _senderViewForAnimation.layer.contentsRect;
             resizableImageView.layer.frame = senderViewOriginalFrame;
         } completion:^(BOOL finished) {
             completion();
